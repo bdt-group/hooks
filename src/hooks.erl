@@ -9,20 +9,16 @@
 -behaviour(gen_server).
 
 %% External exports
--export([start_link/0,
-	 add/4,
-	 del/4,
-	 run/2,
-	 run/3,
-	 run_fold/3,
-	 run_fold/4]).
+-export([start_link/0]).
+-export([add/4]).
+-export([del/4]).
+-export([run/2, run/3]).
+-export([run_fold/3, run_fold/4]).
 %% gen_server callbacks
--export([init/1,
-	 handle_call/3,
-	 handle_cast/2,
-	 code_change/3,
-	 handle_info/2,
-	 terminate/2]).
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2,
+         code_change/3, terminate/2]).
+
+-include_lib("kernel/include/logger.hrl").
 
 -record(state, {}).
 -type state() :: #state{}.
@@ -47,19 +43,19 @@ del(Hook, Module, Function, Seq) ->
 -spec run(hook(), list()) -> ok.
 run(Hook, Args) ->
     try ets:lookup_element(hooks, Hook, 2) of
-	Ls ->
-	    run(Ls, Hook, Args)
+        Ls ->
+            run(Ls, Hook, Args)
     catch _:badarg ->
-	    ok
+            ok
     end.
 
 -spec run_fold(hook(), T, list()) -> T.
 run_fold(Hook, Acc, Args) ->
     try ets:lookup_element(hooks, Hook, 2) of
-	Ls ->
-	    run_fold(Ls, Hook, Acc, Args)
+        Ls ->
+            run_fold(Ls, Hook, Acc, Args)
     catch _:badarg ->
-	    Acc
+            Acc
     end.
 
 %%%----------------------------------------------------------------------
@@ -78,7 +74,7 @@ handle_call({del, Hook, Module, Function, Seq}, _From, State) ->
     Reply = handle_del(Hook, {Seq, Module, Function}),
     {reply, Reply, State};
 handle_call(Request, {From, _}, State) ->
-    error_logger:warning_msg("Unexpected call from ~p: ~p", [From, Request]),
+    ?LOG_WARNING("Unexpected call from ~p: ~p", [From, Request]),
     {noreply, State}.
 
 -spec handle_add(hook(), callback()) -> ok.
@@ -112,12 +108,12 @@ handle_del(Hook, El) ->
 
 -spec handle_cast(term(), state()) -> {noreply, state()}.
 handle_cast(Msg, State) ->
-    error_logger:warning_msg("Unexpected cast: ~p", [Msg]),
+    ?LOG_WARNING("Unexpected cast: ~p", [Msg]),
     {noreply, State}.
 
 -spec handle_info(term(), state()) -> {noreply, state()}.
 handle_info(Info, State) ->
-    error_logger:warning_msg("Unexpected info: ~p", [Info]),
+    ?LOG_WARNING("Unexpected info: ~p", [Info]),
     {noreply, State}.
 
 -spec terminate(term(), state()) -> ok.
@@ -137,12 +133,12 @@ run([], _Hook, _Args) ->
 run([{_Seq, Module, Function} | Ls], Hook, Args) ->
     Res = safe_apply(Hook, Module, Function, Args),
     case Res of
-	'EXIT' ->
-	    run(Ls, Hook, Args);
-	stop ->
-	    ok;
-	_ ->
-	    run(Ls, Hook, Args)
+        'EXIT' ->
+            run(Ls, Hook, Args);
+        stop ->
+            ok;
+        _ ->
+            run(Ls, Hook, Args)
     end.
 
 -spec run_fold([callback()], hook(), T, list()) -> T.
@@ -151,21 +147,23 @@ run_fold([], _Hook, Acc, _Args) ->
 run_fold([{_Seq, Module, Function} | Ls], Hook, Acc, Args) ->
     Res = safe_apply(Hook, Module, Function, [Acc | Args]),
     case Res of
-	'EXIT' ->
-	    run_fold(Ls, Hook, Acc, Args);
-	stop ->
-	    Acc;
-	{stop, NewAcc} ->
-	    NewAcc;
-	NewAcc ->
-	    run_fold(Ls, Hook, NewAcc, Args)
+        'EXIT' ->
+            run_fold(Ls, Hook, Acc, Args);
+        stop ->
+            Acc;
+        {stop, NewAcc} ->
+            NewAcc;
+        NewAcc ->
+            run_fold(Ls, Hook, NewAcc, Args)
     end.
 
 -spec safe_apply(hook(), module(), atom(), list()) -> any().
 safe_apply(Hook, Module, Function, Args) ->
+    ?LOG_DEBUG("Running hook ~p: ~p:~p/~B",
+               [Hook, Module, Function, length(Args)]),
     try apply(Module, Function, Args)
     catch E:R:St when E /= exit; R /= normal ->
-	    error_logger:error_msg(
+            error_logger:error_msg(
               "Hook ~p crashed when running ~p:~p/~p:~n" ++
                   string:join(
                     ["** ~ts"|
@@ -174,7 +172,7 @@ safe_apply(Hook, Module, Function, Args) ->
                     "~n"),
               [Hook, Module, Function, length(Args),
                format_exception(2, E, R, St)|Args]),
-	    'EXIT'
+            'EXIT'
     end.
 
 format_exception(Level, Class, Reason, Stacktrace) ->
@@ -182,5 +180,5 @@ format_exception(Level, Class, Reason, Stacktrace) ->
       Level, Class, Reason, Stacktrace,
       fun(_M, _F, _A) -> false end,
       fun(Term, I) ->
-	      io_lib:print(Term, I, 80, -1)
+              io_lib:print(Term, I, 80, -1)
       end).
