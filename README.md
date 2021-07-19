@@ -1,7 +1,7 @@
 hooks
 =====
 
-An OTP application
+Global callbacks engine with robust state management.
 
 Build
 -----
