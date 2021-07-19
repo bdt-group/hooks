@@ -1,0 +1,14 @@
+language: erlang
+
+otp_release:
+  - 22.3
+  - 23.1.2
+
+script:
+  - make compile
+  - make lint
+  - make xref
+  - make dialyze
+
+notifications:
+  email: true
