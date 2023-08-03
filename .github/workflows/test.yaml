@@ -1,0 +1,20 @@
+on: push
+
+jobs:
+  compile:
+    runs-on: ubuntu-20.04
+    name: Erlang/OTP ${{matrix.otp}} / rebar3 ${{matrix.rebar3}}
+    strategy:
+      matrix:
+        otp: ['23.1.2']
+        rebar3: ['3.14.3']
+    steps:
+      - uses: actions/checkout@v3
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: ${{matrix.otp}}
+          rebar3-version: ${{matrix.rebar3}}
+      - run: make compile
+      - run: make lint
+      - run: make xref
+      - run: make dialyze
